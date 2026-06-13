@@ -809,9 +809,9 @@ let zukanCurrent = null;  // ずかんで表示中の {ch, ds}
 const STICKER_POOL = ['🐶','🐱','🦊','🐰','🐻','🐼','🐨','🐯','🦁','🐸','🐵','🐧','🦄','🐢','🐬','🦋','⭐','🌈','🚀','🍓','🍩','🍦','🎈','👑'];
 
 /* ===== INIT ===== */
-window.onload = function() {
+window.onload = async function() {
     loadData();
-    handleShare();
+    await handleShare();
     renderSelects();
     updateStats();
     setupCanvas();
@@ -839,7 +839,7 @@ function saveData() {
     localStorage.setItem('kanji_zukan', JSON.stringify(zukan));
 }
 
-function handleShare() {
+async function handleShare() {
     const params = new URLSearchParams(location.search);
     const dCode = params.get('d');       // 新形式（圧縮・単一/複数の両対応）
     let shareCode = params.get('share');  // 旧形式（base64・単一）
@@ -847,7 +847,7 @@ function handleShare() {
     let result = null;
     try {
         if (dCode) {
-            result = decodeSetCode(dCode);
+            result = await decodeSetCode(dCode);
         } else {
             let p = shareCode.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
             while (p.length % 4) p += '=';
@@ -986,9 +986,26 @@ function deleteSet() {
         renderSelects(); loadEditor(); saveData();
     }
 }
-/* ===== 配布リンクの符号化（LZW圧縮でURLを短く） ===== */
+/* ===== 配布リンクの符号化（deflate / LZW でURLを短く） ===== */
 function b64urlFromBin(b) { return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function binFromB64url(s) { s = s.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return atob(s); }
+// バイナリ文字列 ⇄ Uint8Array
+function binToU8(bin) { const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+function u8ToBin(u8) { let s = ''; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return s; }
+// deflate圧縮（ブラウザ標準。最も小さくなる。未対応の古い端末では使わない）
+const HAS_DEFLATE = (typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined');
+async function deflateBin(bin) {
+    const cs = new CompressionStream('deflate-raw');
+    const w = cs.writable.getWriter(); w.write(binToU8(bin)); w.close();
+    const buf = await new Response(cs.readable).arrayBuffer();
+    return u8ToBin(new Uint8Array(buf));
+}
+async function inflateBin(bin) {
+    const ds = new DecompressionStream('deflate-raw');
+    const w = ds.writable.getWriter(); w.write(binToU8(bin)); w.close();
+    const buf = await new Response(ds.readable).arrayBuffer();
+    return u8ToBin(new Uint8Array(buf));
+}
 function lzwEncode(str) {
     const dict = new Map(); for (let i = 0; i < 256; i++) dict.set(String.fromCharCode(i), i);
     let next = 256, w = ""; const out = [];
@@ -1029,18 +1046,25 @@ function encodeSetCode(name, set) {
     const comp = 'C' + b64urlFromBin(packBits(lzwEncode(bin)));
     return comp.length < plain.length ? comp : plain;
 }
-// セット群（複数）→ リンク用コード（圧縮版と非圧縮版の短い方）
-function encodeSetsCode(setsObj) {
+// セット群（複数）→ リンク用コード。deflate('D') / LZW('C') / 非圧縮('0') の一番短いものを採用
+async function encodeSetsCode(setsObj) {
     const arr = Object.keys(setsObj).map(n => [n, setsObj[n].map(i => [i.p, i.k])]);
     const bin = unescape(encodeURIComponent(JSON.stringify({ v: 2, s: arr })));
-    const plain = '0' + b64urlFromBin(bin);
-    const comp = 'C' + b64urlFromBin(packBits(lzwEncode(bin)));
-    return comp.length < plain.length ? comp : plain;
+    const cands = [];
+    cands.push('0' + b64urlFromBin(bin));                                   // 非圧縮
+    cands.push('C' + b64urlFromBin(packBits(lzwEncode(bin))));              // LZW
+    if (HAS_DEFLATE) {                                                      // deflate（一番小さい）
+        try { cands.push('D' + b64urlFromBin(await deflateBin(bin))); } catch (e) {}
+    }
+    return cands.reduce((a, b) => (b.length < a.length ? b : a));
 }
-// リンク用コード → セット（新形式 ?d=）。v2=複数セット / それ以外=旧・単一セット
-function decodeSetCode(code) {
+// リンク用コード → セット。D=deflate / C=LZW / 0=非圧縮。中身が v2 なら複数セット、それ以外は旧・単一
+async function decodeSetCode(code) {
     const m = code[0], body = code.slice(1);
-    const bin = (m === 'C') ? lzwDecode(unpackBits(binFromB64url(body))) : binFromB64url(body);
+    let bin;
+    if (m === 'D') bin = await inflateBin(binFromB64url(body));
+    else if (m === 'C') bin = lzwDecode(unpackBits(binFromB64url(body)));
+    else bin = binFromB64url(body);
     const o = JSON.parse(decodeURIComponent(escape(bin)));
     if (o && o.v === 2 && Array.isArray(o.s)) {
         const sets = {};
@@ -1077,7 +1101,7 @@ function openShareModal() {
 function shareSelectAll(v) {
     document.querySelectorAll('#share-list input[type=checkbox]').forEach(cb => { if (!cb.disabled) cb.checked = v; });
 }
-function doShareSelected() {
+async function doShareSelected() {
     const chosen = {};
     document.querySelectorAll('#share-list input[type=checkbox]').forEach(cb => {
         if (cb.checked) {
@@ -1089,7 +1113,7 @@ function doShareSelected() {
     const keys = Object.keys(chosen);
     if (!keys.length) return toast("セットを1つ以上えらんでください");
     closeModal('modal-share');
-    const url = location.origin + location.pathname + "?d=" + encodeSetsCode(chosen);
+    const url = location.origin + location.pathname + "?d=" + await encodeSetsCode(chosen);
     if (location.protocol === 'file:') {
         openInputModal("⚠️ このリンクは配布できません（ネット上にアップしてから配布してください）", url, () => {});
         return;
