@@ -117,6 +117,8 @@
         }
         .btn-sm { padding: 7px 12px; font-size: 0.8rem; }
         .btn-danger { color: var(--accent); background: var(--accent-soft); border-color: rgba(232,80,58,0.15); }
+        .btn-giveup { background: var(--gray-100); color: var(--gray-500); border-color: var(--gray-200); box-shadow: none; font-weight: 700; }
+        .btn-giveup:active { background: var(--gray-200); }
 
         /* Select */
         select {
@@ -603,6 +605,18 @@
     </div>
 </div>
 
+<!-- 「わからない」確認モーダル（誤タップで×にならないように） -->
+<div id="modal-giveup" class="modal-bg">
+    <div class="modal-box" style="text-align:center;">
+        <h3>わからない？</h3>
+        <p class="bulk-hint" style="margin-bottom:16px; line-height:1.6;">こたえを 見て、つぎへ すすむよ。<br>（この もんだいは ◯に なりません）</p>
+        <div class="modal-btns">
+            <button class="btn btn-primary" onclick="closeModal('modal-giveup')">もう少し やってみる</button>
+            <button class="btn btn-danger" onclick="closeModal('modal-giveup'); doGiveUp();">こたえを 見る ▶</button>
+        </div>
+    </div>
+</div>
+
 <!-- 配布セット選択モーダル -->
 <div id="modal-share" class="modal-bg">
     <div class="modal-box">
@@ -743,7 +757,7 @@
         <div class="play-actions" id="actions-write">
             <button class="btn" onclick="playDemo()">👀 見本</button>
             <button class="btn" onclick="eraseAll()">消す</button>
-            <button class="btn btn-primary" onclick="nextQuestion()" id="next-btn">次へ ▶</button>
+            <button class="btn btn-giveup" onclick="confirmGiveUp()" id="next-btn">わからない</button>
         </div>
     </div>
 
@@ -1493,8 +1507,14 @@ function resolveQuestion(ok) {
     showFeedback(ok, ok ? '⭕' : '❌');
 }
 
-// 「次へ」：答え（全部の漢字）を見せて、正解にはせず次の問題へ
-function nextQuestion() {
+// 「わからない」を押したとき：まず確認（完成直後・採点中の誤タップは無視）
+function confirmGiveUp() {
+    if (resolved) return;                              // 完成直後や採点中は何も起きない（誤タップ防止）
+    if (!modelReady) { toast('お手本を読み込み中…'); return; }
+    openModal('modal-giveup');
+}
+// 確認のあと：答え（全部の漢字）を見せて、正解にはせず次の問題へ
+function doGiveUp() {
     if (resolved) return;
     if (!modelReady) { toast('お手本を読み込み中…'); return; }
     if (demoAnim) { cancelAnimationFrame(demoAnim); demoAnim = null; demoPlaying = false; }
