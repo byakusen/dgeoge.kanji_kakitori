@@ -948,16 +948,32 @@ function shareSet() {
     const url = location.origin + location.pathname + "?share=" + str;
     if (location.protocol === 'file:') {
         // ローカルファイルで開いている場合、リンクは他の端末で使えない
-        openInputModal("⚠️ このリンクは配布できません（下記参照）", url, () => {});
-        setTimeout(() => toast("ネット上にアップしてから配布してください"), 300);
+        openInputModal("⚠️ このリンクは配布できません（ネット上にアップしてから配布してください）", url, () => {});
         return;
     }
-    if (navigator.share) {                         // スマホ・タブレット：共有シートを開く
-        navigator.share({ title: '漢字の問題', text: `「${currentSetName}」`, url }).catch(() => {});
-    } else if (navigator.clipboard) {              // PC：クリップボードにコピー
-        navigator.clipboard.writeText(url).then(() => toast("配布リンクをコピーしました")).catch(() => openInputModal("このリンクを送ってください", url, () => {}));
+    copyTextToClipboard(url, "配布リンクをコピーしました");
+}
+// URLをそのままクリップボードへコピー（共有シートは出さない）
+function copyTextToClipboard(text, okMsg) {
+    const ok = () => toast(okMsg);
+    const fallback = () => {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus(); ta.select();
+            const done = document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (done) { ok(); return; }
+        } catch (e) {}
+        // それでもダメなら手動コピー用に表示
+        openInputModal("このリンクをコピーして送ってください", text, () => {});
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok).catch(fallback);
     } else {
-        openInputModal("このリンクを送ってください", url, () => {});
+        fallback();
     }
 }
 function changePassword() {
