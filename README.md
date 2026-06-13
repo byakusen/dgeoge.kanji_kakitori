@@ -1,0 +1,1 @@
+# dgeoge.kanji_kakitori
