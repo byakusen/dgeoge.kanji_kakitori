@@ -495,6 +495,11 @@
         }
         .bulk-textarea:focus { border-color: var(--blue); }
         .bulk-hint { font-size: 0.8rem; color: var(--gray-500); margin-bottom: 10px; text-align: center; }
+        .share-row { display: flex; align-items: center; gap: 12px; padding: 11px 8px; border-bottom: 1px solid var(--gray-200); cursor: pointer; }
+        .share-row input[type=checkbox] { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--accent); }
+        .share-row .share-name { flex: 1; font-weight: 700; word-break: break-all; }
+        .share-row .share-count { color: var(--gray-500); font-size: 0.85rem; flex: 0 0 auto; }
+        .share-row input:disabled ~ .share-name { color: var(--gray-300); }
 
         /* ===== 選択クイズ（送りがな） ===== */
         .quiz-big {
@@ -598,6 +603,23 @@
     </div>
 </div>
 
+<!-- 配布セット選択モーダル -->
+<div id="modal-share" class="modal-bg">
+    <div class="modal-box">
+        <h3>子どもに配布するセットを選ぶ</h3>
+        <p class="bulk-hint" style="line-height:1.5;">チェックしたセットがリンクに入ります。<br>子どもが開くと、その子の今のセットは<b>このリンクの内容に置きかわります</b>（古いセット・空のセットは消えます）。</p>
+        <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <button class="btn btn-sm" onclick="shareSelectAll(true)">すべて選ぶ</button>
+            <button class="btn btn-sm" onclick="shareSelectAll(false)">すべて外す</button>
+        </div>
+        <div id="share-list" class="editor-list" style="max-height:260px;"></div>
+        <div class="modal-btns">
+            <button class="btn" onclick="closeModal('modal-share')">キャンセル</button>
+            <button class="btn btn-primary" onclick="doShareSelected()">🔗 リンクを作る</button>
+        </div>
+    </div>
+</div>
+
 <!-- 漢字ずかん：書き順モーダル -->
 <div id="modal-zukan" class="modal-bg">
     <div class="modal-box" style="text-align:center;">
@@ -691,7 +713,7 @@
         </div>
 
         <button class="btn btn-primary" onclick="saveAndBack()" style="padding:14px; width:100%; margin-top:12px;">保存して戻る</button>
-        <button class="btn" onclick="shareSet()" style="padding:13px; width:100%; margin-top:8px;">🔗 このセットを子どもに配布（リンクを作る）</button>
+        <button class="btn" onclick="openShareModal()" style="padding:13px; width:100%; margin-top:8px;">🔗 子どもに配布（セットを選んでリンクを作る）</button>
     </div>
 
     <!-- ===== PLAY ===== -->
@@ -819,27 +841,38 @@ function saveData() {
 
 function handleShare() {
     const params = new URLSearchParams(location.search);
-    const dCode = params.get('d');       // 新形式（圧縮）
-    let shareCode = params.get('share');  // 旧形式（base64）
+    const dCode = params.get('d');       // 新形式（圧縮・単一/複数の両対応）
+    let shareCode = params.get('share');  // 旧形式（base64・単一）
     if (!dCode && !shareCode) return;
-    let obj = null;
+    let result = null;
     try {
         if (dCode) {
-            obj = decodeSetCode(dCode);
+            result = decodeSetCode(dCode);
         } else {
             let p = shareCode.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
             while (p.length % 4) p += '=';
             const d = JSON.parse(decodeURIComponent(escape(atob(p))));
-            obj = { name: d.name, data: d.data };
+            result = { multi: false, name: d.name, data: d.data };
         }
-    } catch (e) { obj = null; }
-    if (obj && obj.data) {
-        const name = obj.name + "(共有)";
-        appData[name] = obj.data;
-        currentSetName = name;
+    } catch (e) { result = null; }
+
+    // 取り込むセット群 { 名前: [{p,k},...], ... } を作る
+    let incoming = null;
+    if (result) {
+        if (result.multi) incoming = result.sets;
+        else if (result.data) incoming = { [result.name]: result.data };
+    }
+
+    if (incoming && Object.keys(incoming).length) {
+        // ★上書き：その子の今のセットをまるごと、このリンクの内容に置きかえる
+        appData = incoming;
+        currentSetName = Object.keys(appData)[0];
+        // 消えたセット名の「にがて」データは掃除（実績・シール・図鑑は残す）
+        Object.keys(weakData).forEach(n => { if (!appData[n]) delete weakData[n]; });
         document.getElementById('settings-btn-wrap').style.display = 'none';
         saveData();
-        toast("セットを読み込みました！");
+        const cnt = Object.keys(appData).length;
+        toast(cnt > 1 ? `${cnt}セットを読み込みました！` : "セットを読み込みました！");
     } else {
         toast("リンクの読み込みに失敗しました");
     }
@@ -996,25 +1029,72 @@ function encodeSetCode(name, set) {
     const comp = 'C' + b64urlFromBin(packBits(lzwEncode(bin)));
     return comp.length < plain.length ? comp : plain;
 }
-// リンク用コード → セット（新形式 ?d=）
+// セット群（複数）→ リンク用コード（圧縮版と非圧縮版の短い方）
+function encodeSetsCode(setsObj) {
+    const arr = Object.keys(setsObj).map(n => [n, setsObj[n].map(i => [i.p, i.k])]);
+    const bin = unescape(encodeURIComponent(JSON.stringify({ v: 2, s: arr })));
+    const plain = '0' + b64urlFromBin(bin);
+    const comp = 'C' + b64urlFromBin(packBits(lzwEncode(bin)));
+    return comp.length < plain.length ? comp : plain;
+}
+// リンク用コード → セット（新形式 ?d=）。v2=複数セット / それ以外=旧・単一セット
 function decodeSetCode(code) {
     const m = code[0], body = code.slice(1);
     const bin = (m === 'C') ? lzwDecode(unpackBits(binFromB64url(body))) : binFromB64url(body);
     const o = JSON.parse(decodeURIComponent(escape(bin)));
-    return { name: o.n, data: o.d.map(a => ({ p: a[0], k: a[1] })) };
+    if (o && o.v === 2 && Array.isArray(o.s)) {
+        const sets = {};
+        o.s.forEach(([n, rows]) => { sets[n] = rows.map(a => ({ p: a[0], k: a[1] })); });
+        return { multi: true, sets };
+    }
+    return { multi: false, name: o.n, data: o.d.map(a => ({ p: a[0], k: a[1] })) };
 }
 
-function shareSet() {
+/* ===== 配布（複数セットを選んで1リンクに・上書き配布） ===== */
+let shareSetNames = [];
+function openShareModal() {
     commitEditor();   // 編集中の内容も含める（保存し忘れ対策）
-    const set = appData[currentSetName] || [];
-    const hasData = set.some(i => i.p || i.k);
-    if (!hasData) return toast("先に問題を入力してください");
-    const url = location.origin + location.pathname + "?d=" + encodeSetCode(currentSetName, set);
+    shareSetNames = Object.keys(appData);
+    const box = document.getElementById('share-list');
+    box.innerHTML = "";
+    shareSetNames.forEach((n, idx) => {
+        const set = appData[n] || [];
+        const count = set.filter(i => i.p || i.k).length;
+        const row = document.createElement('label');
+        row.className = 'share-row';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.dataset.idx = idx;
+        cb.checked = count > 0; cb.disabled = count === 0;   // 空セットは選べない
+        const name = document.createElement('span');
+        name.className = 'share-name'; name.textContent = n;
+        const cnt = document.createElement('span');
+        cnt.className = 'share-count'; cnt.textContent = count + '語';
+        row.append(cb, name, cnt);
+        box.appendChild(row);
+    });
+    openModal('modal-share');
+}
+function shareSelectAll(v) {
+    document.querySelectorAll('#share-list input[type=checkbox]').forEach(cb => { if (!cb.disabled) cb.checked = v; });
+}
+function doShareSelected() {
+    const chosen = {};
+    document.querySelectorAll('#share-list input[type=checkbox]').forEach(cb => {
+        if (cb.checked) {
+            const n = shareSetNames[+cb.dataset.idx];
+            const set = (appData[n] || []).filter(i => i.p || i.k);
+            if (set.length) chosen[n] = set;
+        }
+    });
+    const keys = Object.keys(chosen);
+    if (!keys.length) return toast("セットを1つ以上えらんでください");
+    closeModal('modal-share');
+    const url = location.origin + location.pathname + "?d=" + encodeSetsCode(chosen);
     if (location.protocol === 'file:') {
         openInputModal("⚠️ このリンクは配布できません（ネット上にアップしてから配布してください）", url, () => {});
         return;
     }
-    copyTextToClipboard(url, "配布リンクをコピーしました");
+    copyTextToClipboard(url, `${keys.length}セットの配布リンクをコピーしました`);
 }
 // URLをそのままクリップボードへコピー（共有シートは出さない）
 function copyTextToClipboard(text, okMsg) {
