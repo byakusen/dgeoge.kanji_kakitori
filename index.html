@@ -818,17 +818,31 @@ function saveData() {
 }
 
 function handleShare() {
-    const p = new URLSearchParams(location.search).get('share');
-    if (!p) return;
+    const params = new URLSearchParams(location.search);
+    const dCode = params.get('d');       // 新形式（圧縮）
+    let shareCode = params.get('share');  // 旧形式（base64）
+    if (!dCode && !shareCode) return;
+    let obj = null;
     try {
-        const d = JSON.parse(decodeURIComponent(escape(atob(p))));
-        const name = d.name + "(共有)";
-        appData[name] = d.data;
+        if (dCode) {
+            obj = decodeSetCode(dCode);
+        } else {
+            let p = shareCode.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
+            while (p.length % 4) p += '=';
+            const d = JSON.parse(decodeURIComponent(escape(atob(p))));
+            obj = { name: d.name, data: d.data };
+        }
+    } catch (e) { obj = null; }
+    if (obj && obj.data) {
+        const name = obj.name + "(共有)";
+        appData[name] = obj.data;
         currentSetName = name;
         document.getElementById('settings-btn-wrap').style.display = 'none';
         saveData();
         toast("セットを読み込みました！");
-    } catch(e) {}
+    } else {
+        toast("リンクの読み込みに失敗しました");
+    }
     history.replaceState({}, "", location.pathname);
 }
 
@@ -939,15 +953,64 @@ function deleteSet() {
         renderSelects(); loadEditor(); saveData();
     }
 }
+/* ===== 配布リンクの符号化（LZW圧縮でURLを短く） ===== */
+function b64urlFromBin(b) { return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function binFromB64url(s) { s = s.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return atob(s); }
+function lzwEncode(str) {
+    const dict = new Map(); for (let i = 0; i < 256; i++) dict.set(String.fromCharCode(i), i);
+    let next = 256, w = ""; const out = [];
+    for (let i = 0; i < str.length; i++) { const c = str[i], wc = w + c; if (dict.has(wc)) w = wc; else { out.push(dict.get(w)); dict.set(wc, next++); w = c; } }
+    if (w !== "") out.push(dict.get(w)); return out;
+}
+function lzwDecode(codes) {
+    if (!codes.length) return "";
+    const dict = []; for (let i = 0; i < 256; i++) dict[i] = String.fromCharCode(i);
+    let next = 256, prev = dict[codes[0]], out = prev;
+    for (let i = 1; i < codes.length; i++) { const k = codes[i]; let entry;
+        if (dict[k] !== undefined) entry = dict[k]; else if (k === next) entry = prev + prev[0]; else throw new Error('bad code');
+        out += entry; dict[next++] = prev + entry[0]; prev = entry; }
+    return out;
+}
+function packBits(codes) {
+    let max = 0; for (const c of codes) if (c > max) max = c;
+    let bits = 9; while ((1 << bits) <= max) bits++;
+    const cnt = codes.length;
+    const bytes = [bits, (cnt >> 16) & 255, (cnt >> 8) & 255, cnt & 255];
+    let buf = 0, bl = 0;
+    for (const c of codes) { buf = (buf << bits) | c; bl += bits; while (bl >= 8) { bl -= 8; bytes.push((buf >> bl) & 255); } buf &= (1 << bl) - 1; }
+    if (bl > 0) bytes.push((buf << (8 - bl)) & 255);
+    let s = ''; for (const b of bytes) s += String.fromCharCode(b); return s;
+}
+function unpackBits(s) {
+    const bits = s.charCodeAt(0);
+    const cnt = (s.charCodeAt(1) << 16) | (s.charCodeAt(2) << 8) | s.charCodeAt(3);
+    const codes = []; let buf = 0, bl = 0;
+    for (let i = 4; i < s.length && codes.length < cnt; i++) { buf = (buf << 8) | s.charCodeAt(i); bl += 8;
+        while (bl >= bits && codes.length < cnt) { bl -= bits; codes.push((buf >> bl) & ((1 << bits) - 1)); buf &= (1 << bl) - 1; } }
+    return codes;
+}
+// セット → リンク用コード（圧縮版と非圧縮版の短い方を採用）
+function encodeSetCode(name, set) {
+    const bin = unescape(encodeURIComponent(JSON.stringify({ n: name, d: set.map(i => [i.p, i.k]) })));
+    const plain = '0' + b64urlFromBin(bin);
+    const comp = 'C' + b64urlFromBin(packBits(lzwEncode(bin)));
+    return comp.length < plain.length ? comp : plain;
+}
+// リンク用コード → セット（新形式 ?d=）
+function decodeSetCode(code) {
+    const m = code[0], body = code.slice(1);
+    const bin = (m === 'C') ? lzwDecode(unpackBits(binFromB64url(body))) : binFromB64url(body);
+    const o = JSON.parse(decodeURIComponent(escape(bin)));
+    return { name: o.n, data: o.d.map(a => ({ p: a[0], k: a[1] })) };
+}
+
 function shareSet() {
     commitEditor();   // 編集中の内容も含める（保存し忘れ対策）
     const set = appData[currentSetName] || [];
     const hasData = set.some(i => i.p || i.k);
     if (!hasData) return toast("先に問題を入力してください");
-    const str = btoa(unescape(encodeURIComponent(JSON.stringify({ name: currentSetName, data: set }))));
-    const url = location.origin + location.pathname + "?share=" + str;
+    const url = location.origin + location.pathname + "?d=" + encodeSetCode(currentSetName, set);
     if (location.protocol === 'file:') {
-        // ローカルファイルで開いている場合、リンクは他の端末で使えない
         openInputModal("⚠️ このリンクは配布できません（ネット上にアップしてから配布してください）", url, () => {});
         return;
     }
