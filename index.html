@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>漢字書き取りマスター</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --ink: #1a1a2e;
+            --paper: #faf8f5;
+            --accent: #e8503a;
+            --accent-soft: #fff0ee;
+            --success: #2d9f6f;
+            --success-soft: #eafaf2;
+            --warn: #e8a020;
+            --warn-soft: #fff8eb;
+            --blue: #3b7dd8;
+            --blue-soft: #eef4ff;
+            --gray-100: #f5f3f0;
+            --gray-200: #e8e5e0;
+            --gray-300: #d0ccc5;
+            --gray-500: #8a8580;
+            --gray-700: #4a4540;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 8px 30px rgba(0,0,0,0.1);
+            --radius: 14px;
+            --radius-sm: 10px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background: var(--paper);
+            color: var(--ink);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 460px;
+            height: 100vh;
+            max-height: 900px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            background: var(--paper);
+        }
+
+        @media (min-width: 500px) {
+            #app {
+                height: 95vh;
+                border-radius: 20px;
+                box-shadow: var(--shadow-lg), 0 0 0 1px var(--gray-200);
+            }
+        }
+
+        /* Views */
+        .view {
+            position: absolute;
+            inset: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .view.active { opacity: 1; pointer-events: auto; }
+
+        /* Typography */
+        h1 { font-size: 1.6rem; font-weight: 900; }
+        h2 { font-size: 1.2rem; font-weight: 700; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 18px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            background: white;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--ink);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: var(--shadow-sm);
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+            box-shadow: 0 2px 8px rgba(232,80,58,0.25);
+        }
+        .btn-primary:active { background: #d04530; }
+        .btn-ghost {
+            background: transparent;
+            border-color: transparent;
+            box-shadow: none;
+            color: var(--gray-500);
+        }
+        .btn-sm { padding: 7px 12px; font-size: 0.8rem; }
+        .btn-danger { color: var(--accent); background: var(--accent-soft); border-color: rgba(232,80,58,0.15); }
+
+        /* Select */
+        select {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-200);
+            background: white;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--ink);
+            outline: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8580' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Input */
+        input[type="text"], input[type="password"] {
+            padding: 12px 14px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            background: white;
+            color: var(--ink);
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: var(--blue); }
+
+        /* ===== START VIEW ===== */
+        .logo { text-align: center; margin-bottom: 6px; }
+        .logo-icon {
+            display: inline-block;
+            width: 56px; height: 56px;
+            background: var(--accent);
+            border-radius: 16px;
+            color: white;
+            font-size: 1.8rem;
+            line-height: 56px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(232,80,58,0.3);
+            margin-bottom: 8px;
+        }
+        .logo h1 { color: var(--ink); letter-spacing: -0.5px; }
+
+        .stats-card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 13px 18px;
+            margin: 10px 0;
+            box-shadow: var(--shadow-sm);
+        }
+        /* スタート画面は内容が縦に長いので、はみ出したらスクロール＆下に余白 */
+        #view-start { overflow-y: auto; padding-top: 14px; padding-bottom: 26px; }
+        .stats-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .stats-label { font-size: 0.85rem; color: var(--gray-500); }
+        .stats-value { font-weight: 900; color: var(--accent); }
+        .stats-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .badge {
+            width: 28px; height: 28px;
+            background: var(--warn);
+            border-radius: 50%;
+            font-size: 0.7rem;
+            line-height: 28px;
+            text-align: center;
+        }
+
+        .field-group { margin-bottom: 12px; }
+        .field-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--gray-500);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== SETTINGS VIEW ===== */
+        .settings-top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .settings-top h2 { flex: 1; text-align: center; }
+
+        .set-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .set-controls select { flex: 1; min-width: 0; }
+
+        .editor-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .editor-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .editor-list {
+            flex: 1;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .editor-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .editor-row input { flex: 1; min-width: 0; padding: 11px 12px; font-size: 0.95rem; }
+        .editor-row input:nth-child(2) { flex: 0.65; }   /* 漢字欄は少し短く（✕をはみ出させない） */
+        .btn-del {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            padding: 0;
+            flex-shrink: 0;
+            font-size: 1rem;
+            color: var(--accent);
+            background: var(--accent-soft);
+            border: none;
+            cursor: pointer;
+        }
+
+        /* ===== PLAY VIEW ===== */
+        .play-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .progress-text { font-weight: 900; font-size: 1rem; color: var(--gray-500); }
+        .progress-bar-wrap {
+            height: 6px;
+            background: var(--gray-200);
+            border-radius: 3px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .question-text {
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--ink);
+            margin-bottom: 12px;
+            letter-spacing: 2px;
+        }
+
+        .canvas-area {
+            position: relative;
+            flex: 1;
+            min-height: 250px;
+            max-height: 400px;
+            background: white;
+            border: 2px solid var(--gray-200);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.03);
+        }
+        .canvas-area canvas {
+            display: block;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #guide-canvas { z-index: 1; pointer-events: none; }
+        #paint-canvas { z-index: 3; cursor: crosshair; }
+        .canvas-grid { z-index: 2; }
+
+        /* マスの十字はマスごとにJSで描画するため、CSSの十字は無効化 */
+        .canvas-grid {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: none;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 10px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #feedback-icon {
+            font-size: 3.4rem;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            line-height: 1;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15));
+        }
+        #feedback-icon.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .play-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .play-actions .btn { flex: 1; padding: 14px; }
+        .play-actions .btn-primary { flex: 2; font-size: 1.15rem; }
+
+        /* ===== RESULT VIEW ===== */
+        .result-center {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .result-score {
+            font-size: 4rem;
+            font-weight: 900;
+            color: var(--accent);
+            line-height: 1;
+        }
+        .result-perfect {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--success);
+            display: none;
+        }
+        .result-hanamaru { height: 90px; display: flex; align-items: center; }
+        .result-hanamaru img { width: 90px; height: 90px; animation: pop 0.6s forwards; }
+        @keyframes pop {
+            0% { transform: scale(0); }
+            60% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        .result-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .result-actions .btn { padding: 14px; font-size: 1rem; }
+
+        /* ===== MODAL ===== */
+        .modal-bg {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .modal-bg.open { opacity: 1; pointer-events: auto; }
+        .modal-box {
+            background: white;
+            border-radius: 18px;
+            padding: 24px;
+            width: 90%;
+            max-width: 380px;
+            box-shadow: var(--shadow-lg);
+            transform: translateY(15px);
+            transition: transform 0.2s;
+        }
+        .modal-bg.open .modal-box { transform: translateY(0); }
+        .modal-box h3 { text-align: center; margin-bottom: 14px; font-size: 1.05rem; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 14px; }
+        .modal-btns .btn { flex: 1; }
+
+        /* ===== TOAST ===== */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(15px);
+            background: var(--ink);
+            color: white;
+            padding: 10px 28px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            opacity: 0;
+            transition: all 0.25s;
+            z-index: 2000;
+            pointer-events: none;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ===== COMBO BANNER ===== */
+        #combo-banner {
+            position: absolute;
+            top: 8px; left: 50%;
+            transform: translateX(-50%) translateY(-8px) scale(0.85);
+            background: var(--warn);
+            color: white;
+            font-weight: 900;
+            font-size: 0.95rem;
+            padding: 5px 16px;
+            border-radius: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 12;
+            box-shadow: 0 4px 12px rgba(232,160,32,0.35);
+            white-space: nowrap;
+        }
+        #combo-banner.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+
+        /* ===== STICKER COLLECTION ===== */
+        .sticker {
+            width: 30px; height: 30px;
+            line-height: 30px;
+            text-align: center;
+            font-size: 1.1rem;
+            background: var(--gray-100);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+        }
+        .sticker.new { animation: pop 0.5s; }
+
+        /* ===== BULK MODAL ===== */
+        .bulk-textarea {
+            width: 100%;
+            height: 160px;
+            padding: 12px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: none;
+            outline: none;
+        }
+        .bulk-textarea:focus { border-color: var(--blue); }
+        .bulk-hint { font-size: 0.8rem; color: var(--gray-500); margin-bottom: 10px; text-align: center; }
+
+        /* ===== 選択クイズ（送りがな） ===== */
+        .quiz-big {
+            font-size: 3.6rem;
+            font-weight: 900;
+            color: var(--ink);
+            letter-spacing: 3px;
+            text-align: center;
+        }
+        .choice-btn {
+            width: 100%;
+            padding: 18px;
+            border-radius: var(--radius);
+            border: 1px solid var(--gray-200);
+            background: white;
+            font-family: inherit;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--ink);
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.15s ease;
+        }
+        .choice-btn:active { transform: scale(0.98); }
+        .choice-btn.correct { background: var(--success-soft); border-color: var(--success); color: var(--success); }
+        .choice-btn.wrong   { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+        .choice-btn:disabled { cursor: default; }
+
+        /* ===== 漢字ずかん ===== */
+        .zukan-grid {
+            flex: 1;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+            gap: 10px;
+            align-content: start;
+            padding: 4px 2px;
+        }
+        .zukan-card {
+            aspect-ratio: 1 / 1;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            background: white;
+            font-family: inherit;
+            font-size: 1.9rem;
+            font-weight: 900;
+            color: var(--ink);
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+        .zukan-card:active { transform: scale(0.94); }
+        .zukan-empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            color: var(--gray-500);
+            font-size: 0.9rem;
+            line-height: 1.7;
+            padding: 36px 10px;
+        }
+        #zukan-canvas {
+            width: 100%;
+            max-width: 250px;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            background: white;
+            border: 2px solid var(--gray-200);
+            border-radius: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- Input Modal -->
+<div id="modal-input" class="modal-bg">
+    <div class="modal-box">
+        <h3 id="modal-title">入力</h3>
+        <input type="text" id="modal-field" style="width:100%;">
+        <div class="modal-btns">
+            <button class="btn" onclick="closeModal('modal-input')">キャンセル</button>
+            <button class="btn btn-primary" id="modal-ok">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Modal -->
+<div id="modal-bulk" class="modal-bg">
+    <div class="modal-box">
+        <h3>Excelから一括入力</h3>
+        <p class="bulk-hint">「問題」「漢字」の2列をコピーして貼り付け</p>
+        <textarea id="bulk-text" class="bulk-textarea" placeholder="例：&#10;九しゅう&#9;九州&#10;家ぞく&#9;家族"></textarea>
+        <div class="modal-btns">
+            <button class="btn" onclick="closeModal('modal-bulk')">キャンセル</button>
+            <button class="btn btn-primary" id="bulk-ok">取り込む</button>
+        </div>
+    </div>
+</div>
+
+<!-- 漢字ずかん：書き順モーダル -->
+<div id="modal-zukan" class="modal-bg">
+    <div class="modal-box" style="text-align:center;">
+        <h3 id="zukan-modal-title" style="font-size:2rem; margin-bottom:10px;">漢</h3>
+        <div style="display:flex; justify-content:center;">
+            <canvas id="zukan-canvas" width="300" height="300"></canvas>
+        </div>
+        <div id="zukan-count-label" style="margin-top:10px; font-weight:700; color:var(--gray-500); min-height:1.2em;"></div>
+        <div class="modal-btns">
+            <button class="btn" onclick="closeZukanModal()">とじる</button>
+            <button class="btn btn-primary" onclick="playZukanAnim()">もう一回 ▶</button>
+        </div>
+    </div>
+</div>
+
+<div id="app">
+
+    <!-- ===== START ===== -->
+    <div id="view-start" class="view active">
+        <div style="display:flex; justify-content:flex-end;" id="settings-btn-wrap">
+            <button class="btn btn-ghost btn-sm" onclick="checkPassword()">⚙️ 設定</button>
+        </div>
+
+        <div class="logo">
+            <div class="logo-icon">筆</div>
+            <h1>漢字マスター</h1>
+        </div>
+
+        <div class="stats-card">
+            <div class="stats-row">
+                <span class="stats-label">称号</span>
+                <span class="stats-value" id="achieve-title">見習い</span>
+            </div>
+            <div class="stats-row" style="margin-top:6px;">
+                <span class="stats-label">パーフェクト回数</span>
+                <span class="stats-value" id="perfect-count">0</span>
+            </div>
+            <div class="stats-badges" id="stamps-container"></div>
+            <div class="stats-row" style="margin-top:10px;">
+                <span class="stats-label">シールコレクション</span>
+                <span class="stats-value" id="sticker-count">0 / 24</span>
+            </div>
+            <div class="stats-badges" id="stickers-container"></div>
+            <button class="btn" onclick="openZukan()" style="width:100%; margin-top:12px;">📖 漢字ずかん <span id="zukan-btn-count" style="color:var(--accent); margin-left:4px; font-weight:900;">0字</span></button>
+        </div>
+
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:flex-start; gap:10px;">
+            <div class="field-group">
+                <label class="field-label">テストする問題セット</label>
+                <select id="start-set-select"></select>
+            </div>
+            <div class="field-group">
+                <label class="field-label">出題モード</label>
+                <select id="start-mode-select">
+                    <option value="all">全問テスト</option>
+                    <option value="random10">ランダム10問</option>
+                    <option value="random20">ランダム20問</option>
+                    <option value="weak">にがて復習</option>
+                    <option value="okurigana">送りがなクイズ</option>
+                </select>
+                <div id="weak-info" style="font-size:0.8rem; color:var(--gray-500); text-align:center; min-height:1em; margin-top:6px;"></div>
+            </div>
+            <button class="btn btn-primary" onclick="startQuiz()" style="padding:16px; font-size:1.15rem; margin-top:6px;">テスト開始</button>
+        </div>
+    </div>
+
+    <!-- ===== SETTINGS ===== -->
+    <div id="view-settings" class="view">
+        <div class="settings-top">
+            <button class="btn btn-sm" onclick="goStart()">◀ 戻る</button>
+            <h2>設定</h2>
+            <button class="btn btn-sm" onclick="changePassword()">🔑</button>
+        </div>
+
+        <div class="set-controls">
+            <select id="edit-set-select"></select>
+            <button class="btn btn-sm" onclick="renameSet()">✏️</button>
+            <button class="btn btn-sm" onclick="addNewSet()">＋新規</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteSet()">🗑️</button>
+        </div>
+
+        <div class="editor-area">
+            <div class="editor-head">
+                <span style="font-weight:700; font-size:0.95rem;">問題データ</span>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn btn-sm" onclick="openModal('modal-bulk')">📋一括</button>
+                    <button class="btn btn-sm" onclick="addRow()">＋行</button>
+                </div>
+            </div>
+            <div id="data-editor" class="editor-list"></div>
+        </div>
+
+        <button class="btn btn-primary" onclick="saveAndBack()" style="padding:14px; width:100%; margin-top:12px;">保存して戻る</button>
+        <button class="btn" onclick="shareSet()" style="padding:13px; width:100%; margin-top:8px;">🔗 このセットを子どもに配布（リンクを作る）</button>
+    </div>
+
+    <!-- ===== PLAY ===== -->
+    <div id="view-play" class="view">
+        <div class="play-top">
+            <button class="btn btn-ghost btn-sm" onclick="goStart()">◀ やめる</button>
+            <span class="progress-text" id="quiz-progress">1 / 5</span>
+        </div>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+        </div>
+
+        <div class="question-text" id="q-phrase">読み</div>
+
+        <div class="canvas-area" id="canvas-container">
+            <canvas id="guide-canvas"></canvas>
+            <canvas id="paint-canvas"></canvas>
+            <div id="combo-banner"></div>
+            <div class="canvas-grid"></div>
+            <div class="canvas-overlay">
+                <div style="text-align:center;">
+                    <div id="feedback-icon"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="play-actions" id="actions-write">
+            <button class="btn" onclick="playDemo()">👀 見本</button>
+            <button class="btn" onclick="eraseAll()">消す</button>
+            <button class="btn btn-primary" onclick="nextQuestion()" id="next-btn">次へ ▶</button>
+        </div>
+    </div>
+
+    <!-- ===== RESULT ===== -->
+    <div id="view-result" class="view">
+        <h1 style="text-align:center; margin-top:40px;">テスト終了！</h1>
+        <div class="result-center">
+            <div class="result-score" id="result-score">100%</div>
+            <div class="result-perfect" id="result-perfect">✨ パーフェクト！ ✨</div>
+            <div class="result-hanamaru" id="result-hanamaru"></div>
+        </div>
+        <div class="result-actions">
+            <button class="btn btn-primary" onclick="startQuiz()">もう一度やる</button>
+            <button class="btn" onclick="copyReport()">📋 結果をコピー</button>
+            <button class="btn" onclick="goStart()">スタートへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ===== 送りがなクイズ ===== -->
+    <div id="view-okurigana" class="view">
+        <div class="play-top">
+            <button class="btn btn-ghost btn-sm" onclick="goStart()">◀ やめる</button>
+            <span class="progress-text" id="okuri-progress">1 / 5</span>
+        </div>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar" id="okuri-bar" style="width:0%"></div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;">
+            <div style="font-size:0.85rem; color:var(--gray-500); font-weight:700;">正しい 送りがな は どれ？</div>
+            <div class="quiz-big" id="okuri-reading">わらう</div>
+            <div id="okuri-choices" style="display:flex; flex-direction:column; gap:12px; width:100%;"></div>
+        </div>
+    </div>
+
+    <!-- ===== 漢字ずかん ===== -->
+    <div id="view-zukan" class="view">
+        <div class="settings-top">
+            <button class="btn btn-sm" onclick="goStart()">◀ 戻る</button>
+            <h2>漢字ずかん</h2>
+            <span id="zukan-total" style="font-weight:900; color:var(--accent); min-width:40px; text-align:right;">0字</span>
+        </div>
+        <p style="font-size:0.8rem; color:var(--gray-500); text-align:center; margin-bottom:10px;">タップすると 書き順が見られるよ</p>
+        <div id="zukan-grid" class="zukan-grid"></div>
+    </div>
+</div>
+
+<audio id="se-ok" src="https://raw.githubusercontent.com/shun-shun123/sound-effects/main/correct.mp3" preload="auto"></audio>
+<audio id="se-ng" src="https://raw.githubusercontent.com/shun-shun123/sound-effects/main/wrong.mp3" preload="auto"></audio>
+
+<script>
+/* ===== STATE ===== */
+const DEFAULT_DATA = { "漢字セット1": [{p:"", k:""}] };
+let appData = {}, achievements = { perfects: 0 }, currentSetName = "";
+let adminPassword = localStorage.getItem('kanji_pw_v2') || "1234";
+let playDeck = [], qIdx = 0, scoreOk = 0;
+let weakData = {};   // にがて：{ セット名: [{p,k}, ...] }
+let stickers = [];   // 集めたシールの番号
+let zukan = [];      // 漢字ずかん：書けた漢字のコードポイント配列
+let quizMode = 'write';   // 'write'（書き取り）/ 'okurigana'（送りがなクイズ）
+let quizLock = false;     // 選択クイズで回答中のロック
+let zukanAnim = null;     // ずかんの書き順アニメ
+let zukanCurrent = null;  // ずかんで表示中の {ch, ds}
+const STICKER_POOL = ['🐶','🐱','🦊','🐰','🐻','🐼','🐨','🐯','🦁','🐸','🐵','🐧','🦄','🐢','🐬','🦋','⭐','🌈','🚀','🍓','🍩','🍦','🎈','👑'];
+
+/* ===== INIT ===== */
+window.onload = function() {
+    loadData();
+    handleShare();
+    renderSelects();
+    updateStats();
+    setupCanvas();
+    window.addEventListener('resize', resizeCanvas);
+};
+
+function loadData() {
+    const s = localStorage.getItem('kanji_data');
+    appData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA));
+    if (!currentSetName || !appData[currentSetName]) currentSetName = Object.keys(appData)[0];
+    const a = localStorage.getItem('kanji_ach');
+    if (a) achievements = JSON.parse(a);
+    const w = localStorage.getItem('kanji_weak');
+    weakData = w ? JSON.parse(w) : {};
+    const st = localStorage.getItem('kanji_stickers');
+    stickers = st ? JSON.parse(st) : [];
+    const zk = localStorage.getItem('kanji_zukan');
+    zukan = zk ? JSON.parse(zk) : [];
+}
+function saveData() {
+    localStorage.setItem('kanji_data', JSON.stringify(appData));
+    localStorage.setItem('kanji_ach', JSON.stringify(achievements));
+    localStorage.setItem('kanji_weak', JSON.stringify(weakData));
+    localStorage.setItem('kanji_stickers', JSON.stringify(stickers));
+    localStorage.setItem('kanji_zukan', JSON.stringify(zukan));
+}
+
+function handleShare() {
+    const p = new URLSearchParams(location.search).get('share');
+    if (!p) return;
+    try {
+        const d = JSON.parse(decodeURIComponent(escape(atob(p))));
+        const name = d.name + "(共有)";
+        appData[name] = d.data;
+        currentSetName = name;
+        document.getElementById('settings-btn-wrap').style.display = 'none';
+        saveData();
+        toast("セットを読み込みました！");
+    } catch(e) {}
+    history.replaceState({}, "", location.pathname);
+}
+
+/* ===== VIEWS ===== */
+function showView(id) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id === 'view-play') setTimeout(resizeCanvas, 50);
+}
+function goStart() { showView('view-start'); }
+
+/* ===== SELECTS ===== */
+function renderSelects() {
+    ['start-set-select','edit-set-select'].forEach(sid => {
+        const sel = document.getElementById(sid);
+        sel.innerHTML = "";
+        Object.keys(appData).forEach(n => {
+            sel.insertAdjacentHTML('beforeend', `<option value="${n}" ${n===currentSetName?'selected':''}>${n}</option>`);
+        });
+        sel.onchange = e => {
+            currentSetName = e.target.value;
+            document.getElementById('start-set-select').value = currentSetName;
+            document.getElementById('edit-set-select').value = currentSetName;
+            loadEditor();
+            updateWeakInfo();
+        };
+    });
+}
+
+/* ===== SETTINGS ===== */
+function checkPassword() {
+    if (!adminPassword) {
+        openInputModal("先生用パスワードを設定", "", pw => {
+            if (pw) { adminPassword = pw; localStorage.setItem('kanji_pw_v2', pw); openSettings(); }
+        });
+    } else {
+        openInputModal("パスワードを入力", "", pw => {
+            if (pw === adminPassword) openSettings();
+            else if (pw) toast("パスワードが違います");
+        }, true);
+    }
+}
+function openSettings() { loadEditor(); showView('view-settings'); }
+
+function loadEditor() {
+    const c = document.getElementById('data-editor');
+    c.innerHTML = "";
+    const data = appData[currentSetName] || [];
+    data.forEach(i => addRow(i.p, i.k));
+    if (!data.length) addRow();
+}
+function addRow(p="", k="") {
+    const html = `<div class="editor-row">
+        <input type="text" placeholder="読み" value="${p}">
+        <input type="text" placeholder="漢字" value="${k}">
+        <button class="btn-del" onclick="this.parentElement.remove()">✕</button>
+    </div>`;
+    const c = document.getElementById('data-editor');
+    c.insertAdjacentHTML('beforeend', html);
+    c.scrollTop = c.scrollHeight;
+}
+// 編集中の行を appData に確定して保存（画面は移動しない）
+function commitEditor() {
+    const rows = document.querySelectorAll('.editor-row');
+    const d = [];
+    rows.forEach(r => {
+        const ins = r.querySelectorAll('input');
+        if (ins[0].value || ins[1].value) d.push({p:ins[0].value, k:ins[1].value});
+    });
+    appData[currentSetName] = d.length ? d : [{p:"",k:""}];
+    saveData();
+}
+function saveAndBack() {
+    commitEditor();
+    renderSelects(); toast("保存しました"); goStart();
+}
+
+document.getElementById('bulk-ok').onclick = () => {
+    const t = document.getElementById('bulk-text').value;
+    if (!t.trim()) return closeModal('modal-bulk');
+    t.split('\n').forEach(line => {
+        const parts = line.split(/\t|,/);
+        if (parts[0]) addRow(parts[0].trim(), (parts[1]||"").trim());
+    });
+    closeModal('modal-bulk');
+};
+
+function renameSet() {
+    openInputModal("名前を変更", currentSetName, n => {
+        if (n && n !== currentSetName) {
+            appData[n] = appData[currentSetName]; delete appData[currentSetName];
+            currentSetName = n; renderSelects(); saveData();
+        }
+    });
+}
+function addNewSet() {
+    openInputModal("新しいセット名", "", n => {
+        if (n && !appData[n]) {
+            appData[n] = [{p:"",k:""}]; currentSetName = n;
+            renderSelects(); loadEditor();
+        }
+    });
+}
+function deleteSet() {
+    if (Object.keys(appData).length <= 1) return toast("これ以上削除できません");
+    if (confirm("このセットを削除しますか？")) {
+        delete appData[currentSetName]; currentSetName = Object.keys(appData)[0];
+        renderSelects(); loadEditor(); saveData();
+    }
+}
+function shareSet() {
+    commitEditor();   // 編集中の内容も含める（保存し忘れ対策）
+    const set = appData[currentSetName] || [];
+    const hasData = set.some(i => i.p || i.k);
+    if (!hasData) return toast("先に問題を入力してください");
+    const str = btoa(unescape(encodeURIComponent(JSON.stringify({ name: currentSetName, data: set }))));
+    const url = location.origin + location.pathname + "?share=" + str;
+    if (location.protocol === 'file:') {
+        // ローカルファイルで開いている場合、リンクは他の端末で使えない
+        openInputModal("⚠️ このリンクは配布できません（下記参照）", url, () => {});
+        setTimeout(() => toast("ネット上にアップしてから配布してください"), 300);
+        return;
+    }
+    if (navigator.share) {                         // スマホ・タブレット：共有シートを開く
+        navigator.share({ title: '漢字の問題', text: `「${currentSetName}」`, url }).catch(() => {});
+    } else if (navigator.clipboard) {              // PC：クリップボードにコピー
+        navigator.clipboard.writeText(url).then(() => toast("配布リンクをコピーしました")).catch(() => openInputModal("このリンクを送ってください", url, () => {}));
+    } else {
+        openInputModal("このリンクを送ってください", url, () => {});
+    }
+}
+function changePassword() {
+    openInputModal("新しいパスワード", adminPassword, pw => {
+        if (pw) { adminPassword = pw; localStorage.setItem('kanji_pw_v2', pw); toast("変更しました"); }
+    }, true);
+}
+
+/* ===== QUIZ ===== */
+function startQuiz() {
+    const data = appData[currentSetName];
+    const mode = document.getElementById('start-mode-select').value;
+    let base;
+    if (mode === 'weak') {
+        const wl = (weakData[currentSetName] || []).filter(i => i.p && i.k);
+        if (!wl.length) return toast("にがては今ありません 🎉");
+        base = [...wl].sort(() => Math.random() - 0.5);
+    } else {
+        base = [...data].filter(i => i.p && i.k).sort(() => Math.random() - 0.5);
+        if (!base.length) return toast("問題がありません");
+    }
+    if (mode === 'random10') playDeck = base.slice(0,10);
+    else if (mode === 'random20') playDeck = base.slice(0,20);
+    else playDeck = base;
+    qIdx = 0; scoreOk = 0; combo = 0;
+
+    if (mode === 'okurigana') {
+        quizMode = 'okurigana';
+        const items = [...data]
+            .map(i => { const o = buildOkuri(i); return o ? Object.assign({}, i, { _okuri: o }) : null; })
+            .filter(Boolean);
+        if (!items.length) return toast("送りがなの問題が作れませんでした（漢字＋送りがなの語が必要です）");
+        shuffle(items);
+        playDeck = items;
+        qIdx = 0; scoreOk = 0; quizLock = false;
+        showView('view-okurigana'); loadOkuriQ();
+        return;
+    }
+    quizMode = 'write';
+    showView('view-play'); loadQ();
+}
+function loadQ() {
+    const q = playDeck[qIdx];
+    document.getElementById('quiz-progress').innerText = `${qIdx+1} / ${playDeck.length}`;
+    document.getElementById('progress-bar').style.width = ((qIdx / playDeck.length) * 100) + '%';
+    document.getElementById('q-phrase').innerText = q.p || "（読みなし）";
+    resolved = false;
+    groupIdx = 0;          // いま何文字目の漢字を書いているか
+    revealedInGroup = 0;   // その漢字で書けた画数
+    modelReady = false;
+    warnedLoading = false;
+    qHadError = false;     // この問題で間違えたか（にがて判定）
+    strokeWrong = 0;       // いまの画で連続して間違えた回数（ヒント段階化）
+    hintStroke = null;     // しっかりヒント表示中の画
+    demoPlaying = false;
+    if (demoAnim) { cancelAnimationFrame(demoAnim); demoAnim = null; }
+    qGroups = [];
+    clearCanvas();                                                   // 手書きを消す
+    guideCtx.clearRect(0, 0, guideCanvas.width, guideCanvas.height); // マスは白紙
+    loadModel();                                                     // 書き順データを読み込む（非同期）
+}
+
+/* ===== 状態 ===== */
+let resolved = false;
+let groupIdx = 0;          // 熟語の何文字目か
+let revealedInGroup = 0;   // 現在の漢字で書けた画数
+let modelReady = false;    // 書き順データの準備完了フラグ
+let warnedLoading = false;
+let guideAnim = null;
+let qHadError = false;     // この問題で1回でも間違えたか
+let strokeWrong = 0;       // いまの画で連続して間違えた回数
+let hintStroke = null;     // しっかりヒント表示中の画 {gi, si}
+let combo = 0;             // 連続完走コンボ
+let demoPlaying = false;   // お手本アニメ再生中
+let demoAnim = null;
+let qGroups = [];          // [{ch, ds:[d,...], okuri, strokes:[{d,sx,sy,scale,pts},...]}]
+let matchSize = 100;       // 判定の基準サイズ（文字の大きさ）
+
+/* ===== 書き順データ（KanjiVG）の読み込み ===== */
+function kvgUrl(cp) {
+    return 'https://cdn.jsdelivr.net/gh/KanjiVG/kanjivg@master/kanji/' + cp.toString(16).padStart(5, '0') + '.svg';
+}
+async function fetchCharStrokes(ch) {
+    const cp = ch.codePointAt(0);
+    const key = 'kvg_' + cp;
+    const cached = localStorage.getItem(key);
+    if (cached) { try { const a = JSON.parse(cached); if (a && a.length) return a; } catch (e) {} }
+    const res = await fetch(kvgUrl(cp));
+    if (!res.ok) throw new Error('not found');
+    const txt = await res.text();
+    const doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
+    const ds = Array.from(doc.querySelectorAll('path')).map(p => p.getAttribute('d')).filter(Boolean);
+    if (!ds.length) throw new Error('no paths');
+    try { localStorage.setItem(key, JSON.stringify(ds)); } catch (e) {}
+    return ds;
+}
+// 漢字かどうか（CJK統合漢字・拡張・々〇 など）
+function isKanji(ch) {
+    const cp = ch.codePointAt(0);
+    return (cp >= 0x4E00 && cp <= 0x9FFF) || (cp >= 0x3400 && cp <= 0x4DBF) ||
+           (cp >= 0xF900 && cp <= 0xFAFF) || cp === 0x3005 || cp === 0x3007 ||
+           (cp >= 0x20000 && cp <= 0x2A6DF);
+}
+async function loadModel() {
+    const myIdx = qIdx;
+    const target = bracketContent(playDeck[qIdx].k);   // 書くのは（　）の中だけ
+    const chars = Array.from(target).filter(c => c.trim() !== '');
+    if (!chars.length) return;
+    const anyKanji = chars.some(isKanji);
+    try {
+        // 漢字（＝書く）ごとにグループを作り、直後に続くかなを送り仮名として持たせる
+        const groups = [];
+        let leadKana = '';
+        for (const ch of chars) {
+            const writable = anyKanji ? isKanji(ch) : true;
+            if (writable) {
+                groups.push({ ch, ds: await fetchCharStrokes(ch), okuri: '' });
+            } else if (groups.length) {
+                groups[groups.length - 1].okuri += ch;   // 直前の漢字の送り仮名
+            } else {
+                leadKana += ch;                            // 先頭のかな（まれ）
+            }
+        }
+        if (leadKana && groups.length) groups[0].okuri = leadKana + groups[0].okuri;
+        if (myIdx !== qIdx) return;        // 問題が変わっていたら破棄
+        qGroups = groups;
+        layoutModel();
+        modelReady = true;
+        refreshGuide();                    // マスと送り仮名を表示
+    } catch (e) {
+        if (myIdx !== qIdx) return;
+        modelReady = false;
+        toast('お手本データを読み込めませんでした（最初の1回はネット接続が必要です）');
+    }
+}
+
+/* ===== レイアウト（1字ずつ大きなマスに。すべての漢字は同じ大マスに重ねて配置） ===== */
+let bigCell = null;   // {ox, oy, s} 大きいマスの位置・倍率
+function layoutModel() {
+    const w = guideCanvas.width, h = guideCanvas.height;
+    if (!w || !h || !qGroups.length) return;
+    const s = 0.86 * Math.min(w, h) / 109;     // マスいっぱいに大きく
+    const ox = (w - 109 * s) / 2;
+    const oy = (h - 109 * s) / 2;
+    bigCell = { ox, oy, s };
+    matchSize = 109 * s;
+    qGroups.forEach(grp => {
+        grp.strokes = grp.ds.map(d => {
+            const st = { d, sx: ox, sy: oy, scale: s };
+            st.pts = samplePath(st);
+            return st;
+        });
+    });
+}
+
+/* 画（SVGパス）を等間隔にサンプリングして canvas座標の点列にする */
+let _hidPath = null;
+function samplePath(st, k = 24) {
+    if (!_hidPath) {
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+        svg.style.position = 'absolute'; svg.style.left = '-9999px';
+        _hidPath = document.createElementNS(ns, 'path');
+        svg.appendChild(_hidPath);
+        document.body.appendChild(svg);
+    }
+    _hidPath.setAttribute('d', st.d);
+    let L = 1;
+    try { L = _hidPath.getTotalLength() || 1; } catch (e) {}
+    const pts = [];
+    for (let i = 0; i < k; i++) {
+        let p = { x: 0, y: 0 };
+        try { p = _hidPath.getPointAtLength(L * i / (k - 1)); } catch (e) {}
+        pts.push({ x: st.sx + p.x * st.scale, y: st.sy + p.y * st.scale });
+    }
+    pts._len = L * st.scale;
+    return pts;
+}
+
+/* ===== 画・マス・送り仮名の描画 ===== */
+function drawStroke(g, st, color, alpha) {
+    g.save();
+    g.globalAlpha = alpha;
+    g.strokeStyle = color;
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.translate(st.sx, st.sy);
+    g.scale(st.scale, st.scale);
+    g.lineWidth = 5.5;             // 教科書体の印刷字形に近い細さ（viewBox109基準）
+    g.stroke(new Path2D(st.d));
+    g.restore();
+}
+// 大きいマス（薄い枠＋十字の目安）
+function drawCells(g) {
+    const w = guideCanvas.width, h = guideCanvas.height;
+    const m = Math.min(w, h) * 0.04;
+    g.save();
+    g.strokeStyle = 'rgba(0,0,0,0.10)'; g.lineWidth = 1.5;
+    g.strokeRect(m, m, w - 2 * m, h - 2 * m);
+    g.setLineDash([4, 7]); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(w / 2, m); g.lineTo(w / 2, h - m); g.stroke();
+    g.beginPath(); g.moveTo(m, h / 2); g.lineTo(w - m, h / 2); g.stroke();
+    g.setLineDash([]);
+    g.restore();
+}
+// 今書いている漢字の送り仮名を、マスの右下に小さく表示
+function drawOkurigana(g) {
+    if (groupIdx >= qGroups.length) return;
+    const okuri = qGroups[groupIdx].okuri;
+    if (!okuri) return;
+    const w = guideCanvas.width, h = guideCanvas.height;
+    g.save();
+    g.fillStyle = '#8a857d';
+    g.textAlign = 'right'; g.textBaseline = 'alphabetic';
+    g.font = `700 ${h * 0.14}px 'Zen Maru Gothic', sans-serif`;
+    const pad = Math.min(w, h) * 0.07;
+    g.fillText(okuri, w - pad, h - pad);
+    g.restore();
+}
+// すでに書き終えた漢字を、マスの左上に小さく並べて表示（例：林を書くとき森を左上に）
+function drawMiniDone(g) {
+    const w = guideCanvas.width, h = guideCanvas.height;
+    const size = Math.min(w, h) * 0.18;
+    const m = Math.min(w, h) * 0.05;
+    for (let i = 0; i < groupIdx && i < qGroups.length; i++) {
+        const ms = 0.92 * size / 109;
+        const ox = m + i * (size * 0.92) + (size - 109 * ms) / 2;
+        const oy = m + (size - 109 * ms) / 2;
+        qGroups[i].strokes.forEach(st => drawStroke(g, { d: st.d, sx: ox, sy: oy, scale: ms }, '#9a8f86', 1));
+    }
+}
+// マス＋ミニ漢字＋送り仮名＋いま書けた画 をまとめて描き直す
+function refreshGuide(color = '#e8503a') {
+    const g = guideCtx;
+    g.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+    drawCells(g);
+    drawMiniDone(g);
+    drawOkurigana(g);
+    if (groupIdx < qGroups.length) {
+        const gs = qGroups[groupIdx].strokes;
+        for (let i = 0; i < revealedInGroup && i < gs.length; i++) drawStroke(g, gs[i], color, 1);
+        // しっかりヒント：次に書く画を薄く＋始点ドット
+        if (hintStroke && hintStroke.gi === groupIdx && hintStroke.si === revealedInGroup && gs[revealedInGroup]) {
+            drawStroke(g, gs[revealedInGroup], '#e8503a', 0.4);
+            drawStartDot(g, gs[revealedInGroup], 0.9);
+        }
+    }
+}
+
+/* ===== 画ごとの照合 ===== */
+function resamplePts(pts, k = 24) {
+    if (pts.length <= 1) return new Array(k).fill(pts[0] || { x: 0, y: 0 });
+    const d = [0];
+    for (let i = 1; i < pts.length; i++) d.push(d[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+    const total = d[d.length - 1] || 1;
+    const out = [];
+    for (let i = 0; i < k; i++) {
+        const t = total * i / (k - 1);
+        let j = 1; while (j < d.length - 1 && d[j] < t) j++;
+        const seg = (d[j] - d[j - 1]) || 1;
+        const r = (t - d[j - 1]) / seg;
+        out.push({ x: pts[j - 1].x + (pts[j].x - pts[j - 1].x) * r, y: pts[j - 1].y + (pts[j].y - pts[j - 1].y) * r });
+    }
+    return out;
+}
+function polyLen(pts) { let s = 0; for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return s; }
+// 対応点ごとの平均距離(mean)と、許容内に収まった割合(frac)
+function alignScore(A, B) {
+    let s = 0, c = 0; const tol = matchSize * 0.2;
+    for (let i = 0; i < A.length; i++) {
+        const dd = Math.hypot(A[i].x - B[i].x, A[i].y - B[i].y);
+        s += dd; if (dd < tol) c++;
+    }
+    return { mean: s / A.length, frac: c / A.length };
+}
+function endpointDist(A, B) {
+    const n = A.length - 1;
+    const f = (Math.hypot(A[0].x - B[0].x, A[0].y - B[0].y) + Math.hypot(A[n].x - B[n].x, A[n].y - B[n].y)) / 2;
+    const r = (Math.hypot(A[0].x - B[n].x, A[0].y - B[n].y) + Math.hypot(A[n].x - B[0].x, A[n].y - B[0].y)) / 2;
+    return Math.min(f, r);
+}
+function matchStroke(childRaw, model) {
+    if (!model || !model.pts) return false;
+    const cp = childRaw.map(p => ({ x: p[0], y: p[1] }));
+    const A = resamplePts(cp, 24), B = model.pts;
+    const f = alignScore(A, B), r = alignScore(A, [...B].reverse());
+    const best = f.mean <= r.mean ? f : r;              // 向きは不問（良い方で評価）
+    const lm = model.pts._len || polyLen(B);
+    if (lm < matchSize * 0.18) return best.mean < matchSize * 0.22;       // 短い画（点・とめ）
+    const ratio = polyLen(cp) / (lm || 1);
+    return best.mean < matchSize * 0.2 && best.frac >= 0.78
+        && endpointDist(A, B) < matchSize * 0.28
+        && ratio > 0.45 && ratio < 2.4;
+}
+
+/* ===== 1画ごとの確定 ===== */
+function onStrokeDone(childRaw) {
+    if (resolved) { clearCanvas(); return; }
+    if (demoPlaying) { clearCanvas(); return; }
+    if (!modelReady) {
+        clearCanvas();
+        if (!warnedLoading) { toast('お手本を読み込み中…'); warnedLoading = true; }
+        return;
+    }
+    if ((!bigCell || !qGroups[0] || !qGroups[0].strokes) && qGroups.length) layoutModel();
+    if (groupIdx >= qGroups.length) { clearCanvas(); return; }
+    const gs = qGroups[groupIdx].strokes;
+    const expect = gs[revealedInGroup];
+    if (matchStroke(childRaw, expect)) {
+        revealedInGroup++;
+        strokeWrong = 0;                     // 次の画に進むのでリセット
+        hintStroke = null;
+        clearCanvas();                       // 手書きの線を消して…
+        if (revealedInGroup >= gs.length) {  // この漢字を書き終えた
+            if (groupIdx >= qGroups.length - 1) {
+                refreshGuide('#2d9f6f');     // 熟語ぜんぶ完成 → 緑でくっきり
+                playSE('se-ok');
+                resolveQuestion(true);
+            } else {
+                groupIdx++;                  // 次の漢字へ（前の字は左上にミニ表示）
+                revealedInGroup = 0;
+                refreshGuide('#e8503a');
+                playSE('se-ok');
+            }
+        } else {
+            refreshGuide('#e8503a');         // その画を赤で残す
+        }
+    } else {
+        qHadError = true;
+        strokeWrong++;
+        clearCanvas();
+        flashHint(groupIdx, revealedInGroup, strokeWrong);  // 間違えた回数に応じて手厚く
+        playSE('se-ng');
+    }
+}
+function playSE(id) { const se = document.getElementById(id); if (se) { se.currentTime = 0; se.play().catch(() => {}); } }
+
+function resolveQuestion(ok) {
+    if (resolved) return;
+    resolved = true;
+    if (ok) {
+        const q = playDeck[qIdx];
+        if (qHadError) { markWeak(q); combo = 0; }   // 間違えありはにがてに登録
+        else { clearWeak(q); combo++; showCombo(); } // 一発正解はにがてから外す＋コンボ
+        const gotNew = [];
+        qGroups.forEach(grp => { if (addToZukan(grp.ch)) gotNew.push(grp.ch); });  // 書けた漢字をずかんへ
+        saveData();
+        if (gotNew.length) setTimeout(() => toast(`📖 ずかんに「${gotNew.join('・')}」をついか！`), 700);
+    }
+    showFeedback(ok, ok ? '⭕' : '❌');
+}
+
+// 「次へ」：答え（全部の漢字）を見せて、正解にはせず次の問題へ
+function nextQuestion() {
+    if (resolved) return;
+    if (!modelReady) { toast('お手本を読み込み中…'); return; }
+    if (demoAnim) { cancelAnimationFrame(demoAnim); demoAnim = null; demoPlaying = false; }
+    if ((!bigCell || !qGroups[0] || !qGroups[0].strokes) && qGroups.length) layoutModel();
+    resolved = true;
+    markWeak(playDeck[qIdx]);   // 飛ばした問題はにがてに登録
+    combo = 0;
+    saveData();
+    qIdx++;
+    revealAnswerStep(0);        // 答えを1字ずつ・1秒ごとに表示
+}
+// 熟語の答えを、1文字目から順に1秒ずつ表示（前の字は左上にミニ表示）
+function revealAnswerStep(i) {
+    if (i >= qGroups.length) {
+        if (qIdx < playDeck.length) loadQ(); else finishQuiz();
+        return;
+    }
+    groupIdx = i;
+    revealedInGroup = qGroups[i] ? qGroups[i].strokes.length : 0;
+    refreshGuide('#e8503a');
+    setTimeout(() => revealAnswerStep(i + 1), 1000);
+}
+
+/* ===== ヒント：間違えた回数に応じて段階的に手厚く ===== */
+function flashHint(gi, si, level = 1) {
+    const grp = qGroups[gi];
+    if (!grp || !grp.strokes[si]) return;
+    const target = grp.strokes[si];
+    if (guideAnim) cancelAnimationFrame(guideAnim);
+
+    if (level >= 3) {
+        // 3回目以降：正しい画を薄く出したまま残す＋始点を表示（refreshGuideが描く）
+        hintStroke = { gi, si };
+        refreshGuide('#e8503a');
+        return;
+    }
+    // 1回目＝さっと／2回目＝長め・濃いめ＆始点ドット
+    const p = level >= 2
+        ? { up: 200, hold: 900, down: 600, maxA: 1.0, dot: true }
+        : { up: 180, hold: 380, down: 460, maxA: 0.9, dot: false };
+    const start = performance.now();
+    const step = now => {
+        const e = now - start;
+        let a;
+        if (e < p.up) a = e / p.up;
+        else if (e < p.up + p.hold) a = 1;
+        else a = 1 - Math.min(1, (e - p.up - p.hold) / p.down);
+        refreshGuide('#e8503a');
+        drawStroke(guideCtx, target, '#e8503a', a * p.maxA);
+        if (p.dot) drawStartDot(guideCtx, target, a);
+        if (e < p.up + p.hold + p.down) guideAnim = requestAnimationFrame(step);
+        else { guideAnim = null; refreshGuide('#e8503a'); }
+    };
+    guideAnim = requestAnimationFrame(step);
+}
+// 画の始点に「ここから書くよ」の丸印
+function drawStartDot(g, st, alpha = 1) {
+    const p = st.pts && st.pts[0];
+    if (!p) return;
+    g.save();
+    g.globalAlpha = alpha;
+    g.beginPath();
+    g.arc(p.x, p.y, Math.max(5, matchSize * 0.045), 0, Math.PI * 2);
+    g.fillStyle = '#e8503a'; g.fill();
+    g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke();
+    g.restore();
+}
+
+function showFeedback(ok, icon) {
+    const fi = document.getElementById('feedback-icon');
+    fi.innerText = icon;
+    fi.style.color = ok ? 'var(--success)' : 'var(--accent)';
+    fi.classList.add('show');
+
+    const se = document.getElementById(ok ? 'se-ok' : 'se-ng');
+    if (se) { se.currentTime = 0; se.play().catch(()=>{}); }
+
+    if (ok) scoreOk++;
+    qIdx++;
+
+    setTimeout(() => {
+        fi.classList.remove('show');
+        if (qIdx < playDeck.length) loadQ(); else finishQuiz();
+    }, ok ? 1200 : 1800);
+}
+
+function finishQuiz() {
+    combo = 0;
+    const pct = Math.round((scoreOk / playDeck.length) * 100);
+    document.getElementById('result-score').innerText = pct + "%";
+    const perfect = pct === 100;
+    document.getElementById('result-perfect').style.display = perfect ? 'block' : 'none';
+    const hDiv = document.getElementById('result-hanamaru');
+    hDiv.innerHTML = "";
+    if (perfect) {
+        achievements.perfects++;
+        const got = unlockSticker();          // パーフェクトで新しいシールを1枚
+        saveData(); updateStats();
+        hDiv.innerHTML = `<img src="https://raw.githubusercontent.com/byakusen/hanamaru/refs/heads/main/hanamaru2.png">`;
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        if (got) setTimeout(() => toast(`あたらしいシール ${got} をゲット！`), 800);
+    }
+    updateWeakInfo();
+    showView('view-result');
+}
+
+/* ===== CANVAS ===== */
+let strokes = [], curStroke = [], drawing = false;
+const canvas = document.getElementById('paint-canvas');
+const ctx = canvas.getContext('2d');
+const guideCanvas = document.getElementById('guide-canvas');
+const guideCtx = guideCanvas.getContext('2d');
+
+function setupCanvas() {
+    canvas.addEventListener('mousedown', e => startDraw(e.clientX, e.clientY));
+    window.addEventListener('mousemove', e => moveDraw(e.clientX, e.clientY));
+    window.addEventListener('mouseup', stopDraw);
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+    window.addEventListener('touchmove', e => { if(drawing){e.preventDefault(); moveDraw(e.touches[0].clientX, e.touches[0].clientY);} }, {passive:false});
+    window.addEventListener('touchend', stopDraw);
+}
+function resizeCanvas() {
+    const c = document.getElementById('canvas-container');
+    if (!c) return;
+    canvas.width = c.clientWidth;
+    canvas.height = c.clientHeight;
+    guideCanvas.width = c.clientWidth;
+    guideCanvas.height = c.clientHeight;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1a1a2e';
+    // お手本の大きさを再計算して、すでに書けた画を描き直す
+    if (modelReady) { layoutModel(); refreshGuide('#e8503a'); }
+}
+function startDraw(x,y) {
+    if (resolved || demoPlaying) return;
+    drawing = true; curStroke = [];
+    const r = canvas.getBoundingClientRect();
+    const px = x-r.left, py = y-r.top;
+    ctx.beginPath(); ctx.moveTo(px,py); curStroke.push([px,py]);
+}
+function moveDraw(x,y) {
+    if (!drawing) return;
+    const r = canvas.getBoundingClientRect();
+    const px = x-r.left, py = y-r.top;
+    ctx.lineTo(px,py); ctx.stroke(); curStroke.push([px,py]);
+}
+function stopDraw() {
+    if (drawing && curStroke.length > 0) onStrokeDone(curStroke); // 1画ごとに照合
+    curStroke = [];
+    drawing = false;
+}
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    strokes = [];
+}
+// 「消す」：この問題を最初からやり直す（書いた漢字も全部消して1字目から）
+function eraseAll() {
+    if (resolved) return;
+    if (guideAnim) { cancelAnimationFrame(guideAnim); guideAnim = null; }
+    if (demoAnim) { cancelAnimationFrame(demoAnim); demoAnim = null; }
+    demoPlaying = false;
+    groupIdx = 0;
+    revealedInGroup = 0;
+    strokeWrong = 0;
+    hintStroke = null;
+    clearCanvas();
+    if (modelReady) refreshGuide(); else guideCtx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+}
+
+/* ===== STATS ===== */
+function updateStats() {
+    const p = achievements.perfects;
+    const titles = [{m:0,n:"見習い"},{m:1,n:"ルーキー"},{m:3,n:"チャレンジャー"},{m:7,n:"ヒーロー"},{m:15,n:"マスター"},{m:30,n:"レジェンド"}];
+    let name = titles[0].n;
+    titles.forEach(t => { if(p>=t.m) name=t.n; });
+    document.getElementById('achieve-title').innerText = name;
+    document.getElementById('perfect-count').innerText = p;
+    const c = document.getElementById('stamps-container');
+    c.innerHTML = "";
+    for(let i=0; i<Math.min(p,20); i++) c.insertAdjacentHTML('beforeend', '<div class="badge">🌸</div>');
+    if(p>20) c.insertAdjacentHTML('beforeend', `<span style="font-size:0.85rem; font-weight:700; color:var(--gray-500);">+${p-20}</span>`);
+    // シールコレクション
+    const sc = document.getElementById('stickers-container');
+    if (sc) {
+        sc.innerHTML = "";
+        stickers.forEach(i => sc.insertAdjacentHTML('beforeend', `<div class="sticker">${STICKER_POOL[i]}</div>`));
+        document.getElementById('sticker-count').innerText = `${stickers.length} / ${STICKER_POOL.length}`;
+    }
+    const zb = document.getElementById('zukan-btn-count');
+    if (zb) zb.innerText = `${zukan.length}字`;
+    updateWeakInfo();
+}
+
+/* ===== MODALS & UTILS ===== */
+function openInputModal(title, def, cb, hidden=false) {
+    document.getElementById('modal-title').innerText = title;
+    const f = document.getElementById('modal-field');
+    f.value = def; f.type = hidden ? "password" : "text";
+    openModal('modal-input');
+    setTimeout(() => f.focus(), 150);
+    document.getElementById('modal-ok').onclick = () => { cb(f.value); closeModal('modal-input'); };
+    // Returnキーでも OK（日本語変換中の確定Enterは無視）
+    f.onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); document.getElementById('modal-ok').click(); } };
+}
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function toast(m) {
+    const t = document.getElementById('toast');
+    t.innerText = m; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+}
+function copyReport() {
+    openInputModal("なまえを教えてね", "", name => {
+        if (!name) return;
+        const txt = `${name}さん：セット「${currentSetName}」で${Math.round((scoreOk/playDeck.length)*100)}%正解しました！`;
+        navigator.clipboard.writeText(txt).then(() => toast("コピーしました！"));
+    });
+}
+
+/* ===== にがてノート ===== */
+function markWeak(q) {
+    if (!q || !q.k) return;
+    const arr = weakData[currentSetName] || (weakData[currentSetName] = []);
+    if (!arr.some(x => x.k === q.k && x.p === q.p)) arr.push({ p: q.p, k: q.k });
+}
+function clearWeak(q) {
+    const arr = weakData[currentSetName];
+    if (!arr) return;
+    const i = arr.findIndex(x => x.k === q.k && x.p === q.p);
+    if (i >= 0) arr.splice(i, 1);
+    if (!arr.length) delete weakData[currentSetName];
+}
+function updateWeakInfo() {
+    const el = document.getElementById('weak-info');
+    if (!el) return;
+    const n = (weakData[currentSetName] || []).length;
+    el.innerText = n ? `このセットのにがて：${n}語` : '';
+}
+
+/* ===== コンボ ===== */
+function showCombo() {
+    if (combo < 2) return;
+    const b = document.getElementById('combo-banner');
+    if (!b) return;
+    b.textContent = `🔥 ${combo} れんぞく！`;
+    b.classList.add('show');
+    clearTimeout(b._t);
+    b._t = setTimeout(() => b.classList.remove('show'), 1100);
+}
+
+/* ===== ごほうびシール ===== */
+function unlockSticker() {
+    const remaining = STICKER_POOL.map((_, i) => i).filter(i => !stickers.includes(i));
+    if (!remaining.length) return null;            // 全部そろったら終わり
+    const idx = remaining[Math.floor(Math.random() * remaining.length)];
+    stickers.push(idx);
+    return STICKER_POOL[idx];
+}
+
+/* ===== お手本の書き順アニメ ===== */
+// 画（パス）の長さ（パス座標系・未スケール）
+function strokeLen(st) {
+    if (_hidPath) { _hidPath.setAttribute('d', st.d); try { return _hidPath.getTotalLength() || 1; } catch (e) {} }
+    return (st.pts && st.pts._len) ? st.pts._len / st.scale : 100;
+}
+// 画を frac(0〜1) の割合まで描く（青）
+function drawStrokePartial(g, st, frac) {
+    const L = strokeLen(st);
+    g.save();
+    g.strokeStyle = '#3b7dd8';   // お手本は青（赤い実書きと区別）
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.translate(st.sx, st.sy);
+    g.scale(st.scale, st.scale);
+    g.lineWidth = 5.5;
+    g.setLineDash([L, L]);
+    g.lineDashOffset = L * (1 - frac);
+    g.stroke(new Path2D(st.d));
+    g.restore();
+}
+// 見本の下地：curGroup未満の字を左上にミニ表示＋その字の送り仮名を右下に
+function drawDemoBase(curGroup) {
+    const g = guideCtx;
+    const w = guideCanvas.width, h = guideCanvas.height;
+    g.clearRect(0, 0, w, h);
+    drawCells(g);
+    // 書き終えた字を左上に小さく並べる
+    const size = Math.min(w, h) * 0.18;
+    const m = Math.min(w, h) * 0.05;
+    for (let i = 0; i < curGroup && i < qGroups.length; i++) {
+        const ms = 0.92 * size / 109;
+        const ox = m + i * (size * 0.92) + (size - 109 * ms) / 2;
+        const oy = m + (size - 109 * ms) / 2;
+        qGroups[i].strokes.forEach(st => drawStroke(g, { d: st.d, sx: ox, sy: oy, scale: ms }, '#9a8f86', 1));
+    }
+    // 送り仮名（その字の右下）
+    const okuri = qGroups[curGroup] && qGroups[curGroup].okuri;
+    if (okuri) {
+        g.save();
+        g.fillStyle = '#8a857d';
+        g.textAlign = 'right'; g.textBaseline = 'alphabetic';
+        g.font = `700 ${h * 0.14}px 'Zen Maru Gothic', sans-serif`;
+        const pad = Math.min(w, h) * 0.07;
+        g.fillText(okuri, w - pad, h - pad);
+        g.restore();
+    }
+}
+// 「見本」ボタン：熟語を1字目から順に書き順再生（前の字は左上にミニ表示）
+function playDemo() {
+    if (resolved) return;
+    if (!modelReady) { toast('お手本を読み込み中…'); return; }
+    if (demoPlaying) return;
+    if ((!bigCell || !qGroups[0] || !qGroups[0].strokes) && qGroups.length) layoutModel();
+    if (!qGroups.length) return;
+    demoPlaying = true;
+    if (guideAnim) { cancelAnimationFrame(guideAnim); guideAnim = null; }
+    if (demoAnim) { cancelAnimationFrame(demoAnim); demoAnim = null; }
+
+    let dg = 0;            // いま見本中の文字
+    let si = 0;            // その文字の何画目か
+    let holding = false;   // 1字を書き終えて見せている最中か
+    const perStroke = 520, gap = 180, charHold = 1000;
+    let phaseStart = performance.now();
+
+    const finishDemo = () => {
+        demoAnim = null; demoPlaying = false;
+        if (modelReady) refreshGuide('#e8503a');   // 子どもの今の状態に戻す
+    };
+
+    const step = now => {
+        if (!demoPlaying) return;
+        const gs = qGroups[dg].strokes;
+        const e = now - phaseStart;
+        if (holding) {                              // 書き終えた字を1秒見せる
+            drawDemoBase(dg);
+            for (let i = 0; i < gs.length; i++) drawStrokePartial(guideCtx, gs[i], 1);
+            if (e < charHold) { demoAnim = requestAnimationFrame(step); return; }
+            dg++;                                   // 次の字へ（前の字は左上にミニ表示）
+            if (dg >= qGroups.length) { finishDemo(); return; }
+            si = 0; holding = false; phaseStart = now;
+            demoAnim = requestAnimationFrame(step);
+            return;
+        }
+        const frac = Math.min(1, e / perStroke);
+        drawDemoBase(dg);
+        for (let i = 0; i < si; i++) drawStrokePartial(guideCtx, gs[i], 1);  // 済んだ画
+        drawStrokePartial(guideCtx, gs[si], frac);                           // いまの画
+        if (e < perStroke + gap) { demoAnim = requestAnimationFrame(step); return; }
+        si++;
+        holding = (si >= gs.length);                // 全画そろったらホールドへ
+        phaseStart = now;
+        demoAnim = requestAnimationFrame(step);
+    };
+    demoAnim = requestAnimationFrame(step);
+}
+
+/* ===== ユーティリティ ===== */
+function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+/* ===== 漢字ずかん ===== */
+function addToZukan(ch) {
+    if (!ch || !isKanji(ch)) return false;
+    const cp = ch.codePointAt(0);
+    if (zukan.includes(cp)) return false;
+    zukan.push(cp);
+    return true;
+}
+function openZukan() {
+    renderZukan();
+    showView('view-zukan');
+}
+function renderZukan() {
+    const grid = document.getElementById('zukan-grid');
+    grid.innerHTML = "";
+    document.getElementById('zukan-total').innerText = `${zukan.length}字`;
+    if (!zukan.length) {
+        grid.innerHTML = '<div class="zukan-empty">まだ ありません。<br>テストで漢字を書けると<br>ここに あつまるよ！</div>';
+        return;
+    }
+    zukan.forEach(cp => {
+        const ch = String.fromCodePoint(cp);
+        const b = document.createElement('button');
+        b.className = 'zukan-card';
+        b.textContent = ch;
+        b.onclick = () => openZukanChar(ch);
+        grid.appendChild(b);
+    });
+}
+async function openZukanChar(ch) {
+    document.getElementById('zukan-modal-title').textContent = ch;
+    document.getElementById('zukan-count-label').textContent = '読み込み中…';
+    openModal('modal-zukan');
+    let ds;
+    try { ds = await fetchCharStrokes(ch); }
+    catch (e) { document.getElementById('zukan-count-label').textContent = '書き順を読み込めませんでした'; return; }
+    zukanCurrent = { ch, ds };
+    playZukanAnim();
+}
+function closeZukanModal() {
+    if (zukanAnim) { cancelAnimationFrame(zukanAnim); zukanAnim = null; }
+    closeModal('modal-zukan');
+}
+// ずかんの大きな書き順アニメ（1画ずつ・最後は全画くっきり）
+function playZukanAnim() {
+    if (!zukanCurrent) return;
+    if (zukanAnim) { cancelAnimationFrame(zukanAnim); zukanAnim = null; }
+    const cv = document.getElementById('zukan-canvas');
+    const g = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const s = 0.82 * Math.min(W, H) / 109;
+    const ox = (W - 109 * s) / 2, oy = (H - 109 * s) / 2;
+    const strokes = zukanCurrent.ds.map(d => ({ d, sx: ox, sy: oy, scale: s }));
+    samplePath(strokes[0]);   // 隠しpathを初期化（strokeLen用）
+    const counter = document.getElementById('zukan-count-label');
+    const total = strokes.length;
+    const perStroke = 600, gap = 230;
+    let si = 0, phaseStart = performance.now();
+
+    const drawBase = () => {
+        g.clearRect(0, 0, W, H);
+        g.save();
+        g.strokeStyle = 'rgba(0,0,0,0.08)'; g.lineWidth = 1;
+        g.setLineDash([4, 7]);
+        g.beginPath(); g.moveTo(W / 2, 10); g.lineTo(W / 2, H - 10); g.stroke();
+        g.beginPath(); g.moveTo(10, H / 2); g.lineTo(W - 10, H / 2); g.stroke();
+        g.setLineDash([]); g.restore();
+    };
+    const drawPartial = (st, frac, color) => {
+        const L = strokeLen(st);
+        g.save();
+        g.strokeStyle = color; g.lineCap = 'round'; g.lineJoin = 'round';
+        g.translate(st.sx, st.sy); g.scale(st.scale, st.scale);
+        g.lineWidth = 6;
+        g.setLineDash([L, L]); g.lineDashOffset = L * (1 - frac);
+        g.stroke(new Path2D(st.d));
+        g.restore();
+    };
+    const step = now => {
+        const e = now - phaseStart;
+        drawBase();
+        for (let i = 0; i < si; i++) drawPartial(strokes[i], 1, '#1a1a2e');     // 済んだ画は黒
+        if (si < total) {
+            const frac = Math.min(1, e / perStroke);
+            drawPartial(strokes[si], frac, '#e8503a');                          // いまの画は赤
+            if (counter) counter.textContent = `${si + 1} / ${total} 画`;
+            if (e < perStroke + gap) { zukanAnim = requestAnimationFrame(step); return; }
+            si++; phaseStart = now;
+            zukanAnim = requestAnimationFrame(step);
+        } else {
+            if (counter) counter.textContent = `${total} / ${total} 画`;
+            zukanAnim = null;
+        }
+    };
+    zukanAnim = requestAnimationFrame(step);
+}
+
+/* ===== 送りがなクイズ ===== */
+// ひらがな（送りがな）かどうか
+function isKana(ch) {
+    const c = ch.codePointAt(0);
+    return (c >= 0x3041 && c <= 0x309F) || c === 0x30FC;
+}
+// （　）／(　) でくくられた部分があれば、その中だけを返す。なければ全体。
+function bracketContent(str) {
+    if (str == null) return '';
+    const s = String(str);
+    const m = s.match(/[（(]([^）)]*)[）)]/);
+    return (m ? m[1] : s).trim();
+}
+// 「漢字＋送りがな」の語から選択肢を作る。使えない語は null。
+// 漢字はそのままに、送りがなの長さ（＝読みの末尾を何字とるか）だけを変えて誤答を作る。
+// 出題は（　）の中だけ。漢字が1字も読まない選択肢（例：転ころがる）は作らない。
+function buildOkuri(item) {
+    const k = bracketContent(item.k);   // （　）の中だけを使う
+    const p = bracketContent(item.p);
+    if (!k || !p) return null;
+    const kArr = Array.from(k), pArr = Array.from(p);
+    // k の末尾の「ひらがなの並び」＝送りがな
+    let oku = 0;
+    while (oku < kArr.length && isKana(kArr[kArr.length - 1 - oku])) oku++;
+    const okuri = kArr.slice(kArr.length - oku).join('');
+    const stem  = kArr.slice(0, kArr.length - oku).join('');
+    if (oku < 1) return null;                                   // 送りがなが無い
+    if (!stem) return null;                                     // 漢字部分が無い
+    if (!Array.from(stem).every(isKanji)) return null;          // 前は全部漢字（途中にかな無し）
+    if (pArr.length < 3) return null;                           // 読みが短すぎる（選択肢が2つ未満）
+    if (oku >= pArr.length) return null;                        // 漢字が1字も読まないのは除外
+    if (!p.endsWith(okuri)) return null;                        // 読みが送りがなで終わること
+    // 送りがなの長さの候補：1〜(読み-1)。正解は oku。
+    let Ls = [];
+    for (let L = 1; L < pArr.length; L++) Ls.push(L);
+    if (Ls.length > 4) {                                        // 最大4択。正解に近いものを残す
+        Ls.sort((a, b) => Math.abs(a - oku) - Math.abs(b - oku));
+        Ls = Ls.slice(0, 4).sort((a, b) => a - b);
+    }
+    // 各長さで「漢字 + 読みの末尾L字」を作る
+    const seen = new Set(), choices = [];
+    Ls.forEach(L => {
+        const s = stem + pArr.slice(pArr.length - L).join('');
+        if (!seen.has(s)) { seen.add(s); choices.push(s); }
+    });
+    if (choices.length < 2) return null;
+    return { reading: p, correct: k, choices: shuffle(choices) };
+}
+
+function loadOkuriQ() {
+    const q = playDeck[qIdx]._okuri;
+    document.getElementById('okuri-progress').innerText = `${qIdx + 1} / ${playDeck.length}`;
+    document.getElementById('okuri-bar').style.width = ((qIdx / playDeck.length) * 100) + '%';
+    document.getElementById('okuri-reading').innerText = q.reading;
+    const box = document.getElementById('okuri-choices');
+    box.innerHTML = "";
+    q.choices.forEach(c => {
+        const b = document.createElement('button');
+        b.className = 'choice-btn';
+        b.textContent = c;
+        b.onclick = () => answerOkuri(b, c, q.correct);
+        box.appendChild(b);
+    });
+}
+function answerOkuri(btn, chosen, correct) {
+    if (quizLock) return;
+    quizLock = true;
+    const ok = chosen === correct;
+    document.querySelectorAll('#okuri-choices .choice-btn').forEach(b => {
+        b.disabled = true;
+        if (b.textContent === correct) b.classList.add('correct');
+        else if (b === btn) b.classList.add('wrong');
+    });
+    playSE(ok ? 'se-ok' : 'se-ng');
+    if (ok) scoreOk++;
+    qIdx++;
+    setTimeout(() => {
+        quizLock = false;
+        if (qIdx < playDeck.length) loadOkuriQ();
+        else finishSimpleQuiz();
+    }, ok ? 900 : 1500);
+}
+// 書き取りの称号・シール・にがては動かさない、シンプルな結果表示
+function finishSimpleQuiz() {
+    const pct = Math.round((scoreOk / playDeck.length) * 100);
+    document.getElementById('result-score').innerText = pct + "%";
+    const perfect = pct === 100;
+    document.getElementById('result-perfect').style.display = perfect ? 'block' : 'none';
+    const hDiv = document.getElementById('result-hanamaru');
+    hDiv.innerHTML = "";
+    if (perfect) {
+        hDiv.innerHTML = `<img src="https://raw.githubusercontent.com/byakusen/hanamaru/refs/heads/main/hanamaru2.png">`;
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    }
+    showView('view-result');
+}
+</script>
+</body>
+</html>
