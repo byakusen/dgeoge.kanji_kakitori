@@ -1713,8 +1713,23 @@ function updateStats() {
 /* ===== MODALS & UTILS ===== */
 function openInputModal(title, def, cb, hidden=false) {
     document.getElementById('modal-title').innerText = title;
-    const f = document.getElementById('modal-field');
-    f.value = def; f.type = hidden ? "password" : "text";
+    // 入力欄を毎回作り直す。
+    // ※ChromeOSでは、同じ欄をパスワード欄(type=password)に使ったあと文字欄に戻すと
+    //   IMEが「半角英数」に固定されたまま戻らない不具合がある。新しい欄に差し替えてリセットする。
+    const old = document.getElementById('modal-field');
+    const f = document.createElement('input');
+    f.id = 'modal-field';
+    f.type = hidden ? 'password' : 'text';
+    f.style.width = '100%';
+    f.autocomplete = 'off';
+    if (hidden) {
+        f.inputMode = 'numeric';                 // パスワード（数字）向け
+    } else {
+        f.setAttribute('lang', 'ja');            // 日本語（ひらがな・漢字）入力を許可
+        f.setAttribute('autocapitalize', 'off');
+    }
+    f.value = def;
+    old.parentNode.replaceChild(f, old);
     openModal('modal-input');
     setTimeout(() => f.focus(), 150);
     document.getElementById('modal-ok').onclick = () => { cb(f.value); closeModal('modal-input'); };
